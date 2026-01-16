@@ -11,10 +11,18 @@ const Color pnpChatBubbleOther = Colors.white;
 class ChatRoomScreen extends StatefulWidget {
   final String currentUserId, otherUserId, productId;
 
+  // Parameter opsional untuk inisialisasi UI
+  final String? productName;
+  final String? productPrice;
+  final String? productImage;
+
   const ChatRoomScreen({
     required this.currentUserId,
     required this.otherUserId,
     required this.productId,
+    this.productName,
+    this.productPrice,
+    this.productImage,
   });
 
   @override
@@ -105,13 +113,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 final msg = messages[i];
                 bool isMe = msg.senderId == widget.currentUserId;
 
-                // DETEKSI APAKAH PESAN ADALAH INFO ORDER
+                // --- DETEKSI PESAN DATA UNTUK MENAMPILKAN KARTU PESANAN ---
                 if (msg.message.startsWith("ORDER_INFO|")) {
                   var parts = msg.message.split("|");
                   return OrderBubble(
-                    productName: parts[1],
-                    price: "Rp ${parts[2]}",
-                    imageUrl: parts[3],
+                    productName: parts.length > 1 ? parts[1] : "Produk",
+                    price: parts.length > 2 ? "Rp ${parts[2]}" : "Rp 0",
+                    imageUrl: parts.length > 3 ? parts[3] : "",
                     isMe: isMe,
                   );
                 }
@@ -135,9 +143,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
         decoration: BoxDecoration(
           color: isMe ? pnpChatBubbleMe : pnpChatBubbleOther,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(16),
+            topRight: Radius.circular(16),
+            bottomLeft: isMe ? Radius.circular(16) : Radius.circular(0),
+            bottomRight: isMe ? Radius.circular(0) : Radius.circular(16),
+          ),
+          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 2)],
         ),
-        child: Text(message, style: TextStyle(color: isMe ? Colors.white : Colors.black87)),
+        child: Text(
+          message,
+          style: TextStyle(color: isMe ? Colors.white : Colors.black87, fontSize: 15),
+        ),
       ),
     );
   }
@@ -145,15 +162,20 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Widget _buildInputArea() {
     return Container(
       padding: EdgeInsets.all(10),
-      color: Colors.white,
+      decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 4)]),
       child: Row(
         children: [
           Expanded(
-            child: TextField(
-              controller: _msgCtrl,
-              decoration: InputDecoration(hintText: "Tulis pesan...", border: InputBorder.none),
+            child: Container(
+              padding: EdgeInsets.symmetric(horizontal: 15),
+              decoration: BoxDecoration(color: Colors.grey[100], borderRadius: BorderRadius.circular(25)),
+              child: TextField(
+                controller: _msgCtrl,
+                decoration: InputDecoration(hintText: "Tulis pesan...", border: InputBorder.none),
+              ),
             ),
           ),
+          SizedBox(width: 5),
           IconButton(
             icon: Icon(Icons.send, color: pnpPrimaryBlue),
             onPressed: _isSending ? null : _sendMessage,
@@ -180,22 +202,48 @@ class OrderBubble extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(15),
-          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 5)],
+          boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8)],
+          border: Border.all(color: pnpPrimaryBlue.withOpacity(0.2)),
         ),
         child: Column(
           children: [
             Container(
               padding: EdgeInsets.all(10),
-              decoration: BoxDecoration(color: pnpPrimaryBlue.withOpacity(0.1), borderRadius: BorderRadius.vertical(top: Radius.circular(15))),
-              child: Row(children: [Icon(Icons.receipt, size: 16, color: pnpPrimaryBlue), SizedBox(width: 8), Text("Rincian Pesanan", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: pnpPrimaryBlue))]),
+              decoration: BoxDecoration(
+                color: pnpPrimaryBlue.withOpacity(0.05),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.receipt_long, size: 16, color: pnpPrimaryBlue),
+                  SizedBox(width: 8),
+                  Text("Rincian Pesanan", style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: pnpPrimaryBlue)),
+                  Spacer(),
+                  Text("Menunggu COD", style: TextStyle(fontSize: 10, color: Colors.orange[800], fontWeight: FontWeight.bold)),
+                ],
+              ),
             ),
             Padding(
               padding: EdgeInsets.all(12),
               child: Row(
                 children: [
-                  ClipRRect(borderRadius: BorderRadius.circular(8), child: imageUrl.isNotEmpty ? Image.network(imageUrl, width: 50, height: 50, fit: BoxFit.cover) : Container(width: 50, height: 50, color: Colors.grey[200])),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(imageUrl, width: 50, height: 50, fit: BoxFit.cover, errorBuilder: (c, e, s) => Icon(Icons.shopping_bag, size: 30))
+                        : Container(width: 50, height: 50, color: Colors.grey[200], child: Icon(Icons.image, color: Colors.grey)),
+                  ),
                   SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(productName, style: TextStyle(fontWeight: FontWeight.bold)), Text(price, style: TextStyle(color: pnpPrimaryBlue, fontWeight: FontWeight.bold))])),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(productName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        SizedBox(height: 4),
+                        Text(price, style: TextStyle(color: pnpPrimaryBlue, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                  ),
                 ],
               ),
             ),

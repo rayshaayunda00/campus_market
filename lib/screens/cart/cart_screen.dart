@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 
 import '../../services/order_service.dart';
+import '../../services/chat_service.dart';
 import '../../providers/user_provider.dart';
 import '../../models/cart_model.dart';
 import '../chat/chat_room_screen.dart';
@@ -23,7 +24,6 @@ class _CartScreenState extends State<CartScreen> {
     _loadCart();
   }
 
-  // Fetch data dari API
   void _loadCart() {
     final user = Provider.of<UserProvider>(context, listen: false).currentUser;
     if (user != null) {
@@ -39,7 +39,6 @@ class _CartScreenState extends State<CartScreen> {
     }
   }
 
-  // Hitung total harga barang yang dicentang
   void _calculateTotal() {
     double tempTotal = 0;
     for (var item in items) {
@@ -52,66 +51,42 @@ class _CartScreenState extends State<CartScreen> {
     });
   }
 
-  // --- LOGIKA HAPUS ITEM ---
-  void _deleteItem(int cartId, int index) async {
-    bool? confirm = await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text("Hapus Barang"),
-        content: Text("Yakin ingin menghapus barang ini dari keranjang?"),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("Batal")),
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: Text("Hapus", style: TextStyle(color: Colors.red))
-          ),
-        ],
-      ),
+  void _showSnack(String msg, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: color),
     );
-
-    if (confirm == true) {
-      bool success = await OrderService().deleteCartItem(cartId);
-
-      if (success) {
-        setState(() {
-          items.removeAt(index);
-          _calculateTotal();
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Barang dihapus"), duration: Duration(seconds: 1)),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Gagal menghapus barang"), backgroundColor: Colors.red),
-        );
-      }
-    }
   }
 
-  // LOGIKA CHECKOUT
   void _processCheckout() async {
     List<CartItem> selectedItems = items.where((i) => i.isSelected).toList();
 
     if (selectedItems.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Pilih minimal 1 barang untuk dibeli")),
-      );
+      _showSnack("Pilih minimal 1 barang untuk dibeli", Colors.red);
       return;
     }
 
     final user = Provider.of<UserProvider>(context, listen: false).currentUser;
     if (user == null) return;
 
+    setState(() => isLoading = true);
+
     bool success = await OrderService().checkout(user.id);
 
     if (success) {
       CartItem targetItem = selectedItems.first;
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text("Pesanan Dibuat! Membuka chat dengan penjual..."),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      ));
+      String orderMessage = "ORDER_INFO|${targetItem.namaProduk}|${targetItem.harga}|${targetItem.gambar}";
+
+      await ChatService().sendChat(
+        user.id.toString(),
+        targetItem.sellerId.toString(),
+        targetItem.productId,
+        orderMessage,
+      );
+
+      if (!mounted) return;
+
+      _showSnack("Pesanan berhasil dibuat!", Colors.green);
 
       Navigator.pushReplacement(
         context,
@@ -120,13 +95,40 @@ class _CartScreenState extends State<CartScreen> {
             currentUserId: user.id.toString(),
             otherUserId: targetItem.sellerId.toString(),
             productId: targetItem.productId,
+            productName: targetItem.namaProduk,
+            productPrice: targetItem.harga.toString(),
+            productImage: targetItem.gambar,
           ),
         ),
       );
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Gagal Checkout, coba lagi nanti."), backgroundColor: Colors.red),
-      );
+      setState(() => isLoading = false);
+      _showSnack("Gagal Checkout, coba lagi nanti.", Colors.red);
+    }
+  }
+
+  void _deleteItem(int cartId, int index) async {
+    bool? confirm = await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text("Hapus Barang"),
+        content: Text("Yakin ingin menghapus barang ini?"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text("Batal")),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: Text("Hapus", style: TextStyle(color: Colors.red))),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      bool success = await OrderService().deleteCartItem(cartId);
+      if (success) {
+        setState(() {
+          items.removeAt(index);
+          _calculateTotal();
+        });
+        _showSnack("Barang dihapus", Colors.black87);
+      }
     }
   }
 
@@ -135,36 +137,30 @@ class _CartScreenState extends State<CartScreen> {
     final currencyFormatter = NumberFormat.currency(locale: 'id', symbol: 'Rp ', decimalDigits: 0);
 
     return Scaffold(
+      backgroundColor: Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: Text("Keranjang Saya", style: TextStyle(color: Colors.black)),
+        title: Text("Keranjang Saya", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 1,
         iconTheme: IconThemeData(color: Colors.black),
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: Color(0xFF0D47A1)))
           : items.isEmpty
-          ? Center(child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.remove_shopping_cart, size: 60, color: Colors.grey),
-          SizedBox(height: 10),
-          Text("Keranjang kosong"),
-        ],
-      ))
+          ? Center(child: Text("Keranjang kosong"))
           : ListView.builder(
         itemCount: items.length,
-        padding: EdgeInsets.only(bottom: 100),
+        padding: EdgeInsets.only(bottom: 100, top: 10),
         itemBuilder: (ctx, i) {
           final item = items[i];
           return Card(
             margin: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            elevation: 2,
             child: Padding(
               padding: const EdgeInsets.all(8.0),
               child: Row(
                 children: [
-                  // CHECKBOX
                   Checkbox(
                     activeColor: Color(0xFF0D47A1),
                     value: item.isSelected,
@@ -175,19 +171,27 @@ class _CartScreenState extends State<CartScreen> {
                       });
                     },
                   ),
-
-                  // GAMBAR / ICON
+                  // --- TAMPILAN GAMBAR ---
                   Container(
-                    width: 60, height: 60,
+                    width: 60,
+                    height: 60,
                     decoration: BoxDecoration(
                       color: Colors.grey[200],
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Icon(Icons.shopping_bag, color: Colors.grey),
+                    child: item.gambar.isNotEmpty
+                        ? ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.network(
+                        item.gambar,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Icon(Icons.broken_image, color: Colors.grey),
+                      ),
+                    )
+                        : Icon(Icons.shopping_bag, color: Colors.grey),
                   ),
                   SizedBox(width: 10),
-
-                  // DETAIL INFO
+                  // --- TAMPILAN INFO PRODUK ---
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,10 +199,9 @@ class _CartScreenState extends State<CartScreen> {
                         Text(
                           item.namaProduk,
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        SizedBox(height: 4),
-                        Text("Penjual ID: ${item.sellerId}", style: TextStyle(fontSize: 11, color: Colors.grey[600])),
                         SizedBox(height: 4),
                         Text(
                           currencyFormatter.format(item.harga),
@@ -207,8 +210,6 @@ class _CartScreenState extends State<CartScreen> {
                       ],
                     ),
                   ),
-
-                  // TOMBOL HAPUS
                   IconButton(
                     icon: Icon(Icons.delete_outline, color: Colors.red),
                     onPressed: () => _deleteItem(item.id, i),
@@ -219,7 +220,6 @@ class _CartScreenState extends State<CartScreen> {
           );
         },
       ),
-
       bottomNavigationBar: Container(
         padding: EdgeInsets.all(15),
         decoration: BoxDecoration(
@@ -233,7 +233,7 @@ class _CartScreenState extends State<CartScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text("Total Pembayaran:", style: TextStyle(color: Colors.grey[600])),
+                Text("Total Harga", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
                 Text(
                   currencyFormatter.format(totalPrice),
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
@@ -242,14 +242,15 @@ class _CartScreenState extends State<CartScreen> {
             ),
             ElevatedButton(
               onPressed: _processCheckout,
+              child: Text("Checkout (COD)", style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Color(0xFFFFC107),
                 foregroundColor: Color(0xFF0D47A1),
                 padding: EdgeInsets.symmetric(horizontal: 30, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                elevation: 0,
               ),
-              child: Text("Checkout (COD)", style: TextStyle(fontWeight: FontWeight.bold)),
-            ),
+            )
           ],
         ),
       ),

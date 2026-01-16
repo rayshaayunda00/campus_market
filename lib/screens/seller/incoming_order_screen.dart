@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
 import '../../services/order_service.dart';
+import '../chat/chat_room_screen.dart';
 
 // --- WARNA TEMA MODERN ---
 const Color pnpPrimaryBlue = Color(0xFF0D47A1);
@@ -119,10 +120,13 @@ class _IncomingOrderScreenState extends State<IncomingOrderScreen> {
   // WIDGET: ORDER CARD
   // ==========================
   Widget _buildOrderCard(dynamic order) {
+    // Pastikan casting data aman
     final items = (order['Items'] as List<dynamic>?) ?? [];
     final status = order['status'] ?? 'PENDING';
-    final orderId = order['ID'];
-    final totalPrice = order['total_price'] ?? 0; // Pastikan backend kirim ini, atau hitung manual
+    final orderId = order['ID'] ?? 0;
+    // Gunakan num.tryParse atau .toDouble() agar tidak error jika dari backend tipenya string/int
+    final totalPrice = order['total_price'] ?? 0;
+    final buyerId = order['buyer_id']?.toString() ?? "0"; // Ambil ID pembeli
 
     return Container(
       margin: EdgeInsets.only(bottom: 16),
@@ -138,7 +142,6 @@ class _IncomingOrderScreenState extends State<IncomingOrderScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // --- HEADER: ID & STATUS ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -154,7 +157,6 @@ class _IncomingOrderScreenState extends State<IncomingOrderScreen> {
             ),
             Divider(height: 24, thickness: 1, color: Colors.grey[100]),
 
-            // --- LIST BARANG ---
             Column(
               children: items.map((item) => _buildOrderItem(item)).toList(),
             ),
@@ -163,17 +165,34 @@ class _IncomingOrderScreenState extends State<IncomingOrderScreen> {
             Divider(height: 1, color: Colors.grey[200]),
             SizedBox(height: 12),
 
-            // --- TOTAL HARGA ---
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text("Total Pesanan", style: TextStyle(color: Colors.grey[600], fontSize: 13)),
-                Text("Rp $totalPrice", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: pnpPrimaryBlue)),
+                // TOMBOL BARU: Chat Pembeli
+                TextButton.icon(
+                  onPressed: () {
+                    if (items.isNotEmpty) {
+                      Navigator.push(context, MaterialPageRoute(builder: (_) => ChatRoomScreen(
+                        currentUserId: Provider.of<UserProvider>(context, listen: false).currentUser!.id.toString(),
+                        otherUserId: buyerId,
+                        productId: items[0]['product_id'].toString(),
+                      )));
+                    }
+                  },
+                  icon: Icon(Icons.chat_outlined, size: 16, color: pnpPrimaryBlue),
+                  label: Text("Chat Pembeli", style: TextStyle(color: pnpPrimaryBlue, fontSize: 13)),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text("Total Pesanan", style: TextStyle(color: Colors.grey[600], fontSize: 11)),
+                    Text("Rp $totalPrice", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: pnpPrimaryBlue)),
+                  ],
+                ),
               ],
             ),
             SizedBox(height: 16),
 
-            // --- TOMBOL AKSI ---
             _buildActionButtons(orderId, status),
           ],
         ),

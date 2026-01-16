@@ -24,7 +24,8 @@ class OrderService {
 
   // 2. TAMBAH KE KERANJANG
   // Menggunakan snake_case agar sinkron dengan Struct Cart di Golang
-  Future<Map<String, dynamic>?> addToCart(int userId, String productId, int sellerId, String nama, int harga) async {
+  // TAMBAHKAN PARAMETER GAMBAR DI AKHIR
+  Future<Map<String, dynamic>?> addToCart(int userId, String productId, int sellerId, String nama, int harga, String gambar) async {
     try {
       final response = await http.post(
         Uri.parse('${ApiServices.baseUrlCart}/cart'),
@@ -36,7 +37,7 @@ class OrderService {
           "nama_produk": nama,
           "harga": harga.toDouble(),
           "lama_pakai": "Baru",
-          "gambar": "",
+          "gambar": gambar, // Sekarang gambar dikirim ke backend
           "deskripsi": ""
         }),
       );
@@ -44,7 +45,6 @@ class OrderService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return jsonDecode(response.body);
       } else {
-        print("Gagal Add Cart: ${response.body}");
         return null;
       }
     } catch (e) {
@@ -52,7 +52,6 @@ class OrderService {
       return null;
     }
   }
-
   // 3. CHECKOUT
   // Backend Go menggunakan Path Param: /checkout/:buyerId
   Future<bool> checkout(int userId) async {

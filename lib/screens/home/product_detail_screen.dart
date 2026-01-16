@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 
 import '../../models/product_model.dart';
 import '../../services/order_service.dart';
-import '../../services/chat_service.dart'; // Tambahkan import ini
+import '../../services/chat_service.dart';
 import '../../providers/user_provider.dart';
 import '../chat/chat_room_screen.dart';
 import '../cart/cart_screen.dart';
@@ -59,16 +59,28 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
+  // ==========================================
+  // 1. LOGIKA TAMBAH KE KERANJANG (DIPERBAIKI)
+  // ==========================================
   Future<void> _handleAddToCart(UserProvider userProvider) async {
     if (isBuying) return;
     final user = userProvider.currentUser;
     int buyerId = user?.id ?? 1;
     String sId = widget.product.sellerId;
     int sellerIdInt = int.tryParse(sId) ?? 0;
+
     setState(() => isBuying = true);
     try {
+      // PERBAIKAN: Sertakan parameter gambar agar data di keranjang lengkap
       var response = await OrderService().addToCart(
-          buyerId, widget.product.id, sellerIdInt, widget.product.namaProduk, widget.product.harga);
+          buyerId,
+          widget.product.id,
+          sellerIdInt,
+          widget.product.namaProduk,
+          widget.product.harga,
+          widget.product.gambar.isNotEmpty ? widget.product.gambar[0] : ""
+      );
+
       if (response != null) {
         _showSnack("Berhasil masuk keranjang!", Colors.green);
       } else {
@@ -81,7 +93,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  // --- LOGIKA BELI SEKARANG (DIPERBAIKI UNTUK SYNC CHAT) ---
+  // ==========================================
+  // 2. LOGIKA BELI SEKARANG (SYNC CHAT & ORDER)
+  // ==========================================
   Future<void> _handleBuyNow(UserProvider userProvider) async {
     if (isBuying) return;
     final user = userProvider.currentUser;
@@ -96,23 +110,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       String sId = widget.product.sellerId;
       int sellerIdInt = int.tryParse(sId) ?? 0;
 
-      // 1. Add to Cart
+      // 1. Add to Cart (Gunakan ID & Data Valid dari Server)
       var cartResponse = await OrderService().addToCart(
-          user.id, pId, sellerIdInt, widget.product.namaProduk, widget.product.harga);
+          user.id,
+          pId,
+          sellerIdInt,
+          widget.product.namaProduk,
+          widget.product.harga,
+          widget.product.gambar.isNotEmpty ? widget.product.gambar[0] : ""
+      );
+
       if (cartResponse == null) throw Exception("Gagal add to cart");
 
+      // Ambil ID dari respon Cart Service untuk sinkronisasi chat
       String validProductId = cartResponse['cart']['product_id'].toString();
       String validSellerId = cartResponse['cart']['seller_id'].toString();
 
-      // 2. Checkout
+      // 2. Proses Checkout
       await Future.delayed(Duration(milliseconds: 300));
       bool checkoutSuccess = await OrderService().checkout(user.id);
 
       if (checkoutSuccess) {
         if (!mounted) return;
 
-        // --- PERBAIKAN: KIRIM PESAN FORMAT ORDER KE DATABASE ---
+        // 3. KIRIM PESAN OTOMATIS KE DATABASE (Format ORDER_INFO)
         String orderMessage = "ORDER_INFO|${widget.product.namaProduk}|${widget.product.harga}|${widget.product.gambar.isNotEmpty ? widget.product.gambar[0] : ""}";
+
         await ChatService().sendChat(
           user.id.toString(),
           validSellerId,
@@ -120,14 +143,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           orderMessage,
         );
 
-        // 3. Pindah ke Chat Room
+        // 4. Pindah ke Chat Room
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => ChatRoomScreen(
             currentUserId: user.id.toString(),
             otherUserId: validSellerId,
             productId: validProductId,
-            // Hilangkan productName dll di sini agar UI konsisten mengambil dari pesan DB
           )),
         );
 
