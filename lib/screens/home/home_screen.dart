@@ -635,6 +635,9 @@ class _HomeScreenState extends State<HomeScreen> {
 // =========================================
 // WIDGET CARD PRODUK
 // =========================================
+// =========================================
+// WIDGET CARD PRODUK (RATING DIHAPUS)
+// =========================================
 class _ProductGridCard extends StatelessWidget {
   final Product product;
   final VoidCallback onTap;
@@ -697,21 +700,17 @@ class _ProductGridCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, height: 1.2),
                   ),
-                  SizedBox(height: 6),
-                  Text(
-                    "Rp ${product.harga}",
-                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: pnpPrimaryBlue),
-                  ),
-                  SizedBox(height: 4),
+                  SizedBox(height: 8),
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Icon(Icons.star, size: 12, color: Colors.amber),
-                      SizedBox(width: 4),
-                      Text("4.8", style: TextStyle(fontSize: 11, color: Colors.grey)),
-                      Spacer(),
+                      Text(
+                        "Rp ${product.harga}",
+                        style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: pnpPrimaryBlue),
+                      ),
                       Icon(Icons.more_horiz, size: 16, color: Colors.grey[400])
                     ],
-                  )
+                  ),
                 ],
               ),
             ),

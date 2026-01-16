@@ -3,8 +3,13 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../../providers/user_provider.dart';
-import '../../api/api_services.dart'; // Pastikan path benar
+import '../../api/api_services.dart';
 import 'chat_room_screen.dart';
+
+// Gunakan konstanta warna agar konsisten dengan HomeScreen
+const Color pnpPrimaryBlue = Color(0xFF0D47A1);
+const Color pnpLightBlue = Color(0xFFE3F2FD);
+const Color pnpBackground = Color(0xFFFAFAFA);
 
 class ChatListScreen extends StatefulWidget {
   @override
@@ -21,13 +26,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _fetchChatList();
   }
 
+  // Fungsi helper untuk merapikan tampilan pesan ORDER_INFO
+  String _formatLastMessage(String message) {
+    if (message.startsWith("ORDER_INFO|")) {
+      List<String> parts = message.split("|");
+      return "📦 Pesanan: ${parts.length > 1 ? parts[1] : 'Produk'}";
+    }
+    return message;
+  }
+
   Future<void> _fetchChatList() async {
     final user = Provider.of<UserProvider>(context, listen: false).currentUser;
     if (user == null) return;
 
     try {
-      // Panggil endpoint baru Python
-      // Pastikan ApiServices.baseUrlChat mengarah ke port 8094
       final url = '${ApiServices.baseUrlChat}/my-chats/${user.id}';
       final response = await http.get(Uri.parse(url));
 
@@ -39,11 +51,8 @@ class _ChatListScreenState extends State<ChatListScreen> {
             isLoading = false;
           });
         }
-      } else {
-        print("Error fetch chats: ${response.statusCode}");
       }
     } catch (e) {
-      print("Error: $e");
       if (mounted) setState(() => isLoading = false);
     }
   }
@@ -51,66 +60,96 @@ class _ChatListScreenState extends State<ChatListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: pnpBackground,
       appBar: AppBar(
-        title: Text("Pesan", style: TextStyle(color: Colors.black87)),
-        backgroundColor: Colors.white,
-        elevation: 1,
-        iconTheme: IconThemeData(color: Colors.black87),
+        title: Text("Pesan", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: pnpPrimaryBlue,
+        elevation: 0,
+        iconTheme: IconThemeData(color: Colors.white),
       ),
       body: isLoading
-          ? Center(child: CircularProgressIndicator())
+          ? Center(child: CircularProgressIndicator(color: pnpPrimaryBlue))
           : chatList.isEmpty
           ? _buildEmptyState()
-          : ListView.builder(
-        itemCount: chatList.length,
-        itemBuilder: (context, index) {
-          final chat = chatList[index];
-          final otherUserId = chat['other_user_id'].toString();
-          final productId = chat['product_id'].toString();
-          final lastMessage = chat['message'] ?? '';
-          // final time = chat['timestamp'] ?? ''; // Bisa diformat nanti
+          : RefreshIndicator(
+        onRefresh: _fetchChatList,
+        child: ListView.separated(
+          padding: EdgeInsets.all(16),
+          itemCount: chatList.length,
+          separatorBuilder: (context, index) => SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final chat = chatList[index];
+            final otherUserId = chat['other_user_id'].toString();
+            final productId = chat['product_id'].toString();
+            final rawMessage = chat['message'] ?? '';
 
-          return ListTile(
-            leading: CircleAvatar(
-              backgroundColor: Colors.blue[100],
-              child: Icon(Icons.person, color: Colors.blue[800]),
-            ),
-            title: Text(
-              "User ID: $otherUserId", // Idealnya panggil API User untuk dapat nama
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-            subtitle: Row(
-              children: [
-                Icon(Icons.shopping_bag_outlined, size: 14, color: Colors.grey),
-                SizedBox(width: 4),
-                Text("Produk #$productId", style: TextStyle(fontSize: 12, color: Colors.blue)),
-                SizedBox(width: 8),
-                Expanded(
+            return Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 10,
+                    offset: Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ListTile(
+                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                leading: CircleAvatar(
+                  radius: 25,
+                  backgroundColor: pnpLightBlue,
+                  child: Icon(Icons.person, color: pnpPrimaryBlue, size: 30),
+                ),
+                title: Padding(
+                  padding: const EdgeInsets.only(bottom: 4.0),
                   child: Text(
-                    lastMessage,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.grey[600]),
+                    "Pengguna #$otherUserId",
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                   ),
                 ),
-              ],
-            ),
-            trailing: Icon(Icons.chevron_right, size: 16, color: Colors.grey),
-            onTap: () {
-              // Navigasi ke Chat Room saat diklik
-              final currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ChatRoomScreen(
-                    currentUserId: currentUser!.id.toString(),
-                    otherUserId: otherUserId,
-                    productId: productId,
-                  ),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        "Produk ID: $productId",
+                        style: TextStyle(fontSize: 10, color: Colors.orange[800], fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                    SizedBox(height: 6),
+                    Text(
+                      _formatLastMessage(rawMessage),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    ),
+                  ],
                 ),
-              ).then((_) => _fetchChatList()); // Refresh saat kembali
-            },
-          );
-        },
+                trailing: Icon(Icons.chevron_right, color: Colors.grey[400]),
+                onTap: () {
+                  final currentUser = Provider.of<UserProvider>(context, listen: false).currentUser;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChatRoomScreen(
+                        currentUserId: currentUser!.id.toString(),
+                        otherUserId: otherUserId,
+                        productId: productId,
+                      ),
+                    ),
+                  ).then((_) => _fetchChatList());
+                },
+              ),
+            );
+          },
+        ),
       ),
     );
   }
@@ -120,9 +159,14 @@ class _ChatListScreenState extends State<ChatListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.chat_bubble_outline, size: 80, color: Colors.grey[300]),
-          SizedBox(height: 10),
-          Text("Belum ada pesan", style: TextStyle(color: Colors.grey)),
+          Container(
+            padding: EdgeInsets.all(20),
+            decoration: BoxDecoration(color: Colors.grey[100], shape: BoxShape.circle),
+            child: Icon(Icons.chat_bubble_outline_rounded, size: 60, color: Colors.grey[400]),
+          ),
+          SizedBox(height: 16),
+          Text("Belum ada percakapan", style: TextStyle(color: Colors.grey[600], fontSize: 16, fontWeight: FontWeight.w500)),
+          Text("Mulailah bertanya pada penjual!", style: TextStyle(color: Colors.grey[400], fontSize: 12)),
         ],
       ),
     );

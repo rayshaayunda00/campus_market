@@ -34,21 +34,32 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
   Future<void> _fetchSellerName() async {
     String sId = widget.product.sellerId;
+
     if (sId.isEmpty || sId == "0") {
-      if (mounted) setState(() => sellerName = "Penjual (ID Error)");
+      if (mounted) setState(() => sellerName = "Penjual Tidak Terdaftar");
       return;
     }
 
     try {
+      // Port 8091 adalah port User Service sesuai konfigurasi Docker
       final String url = 'http://10.0.2.2:8091/users/$sId';
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (mounted) setState(() => sellerName = data['nama'] ?? "Nama Tidak Diketahui");
+
+        if (mounted) {
+          setState(() {
+            // Mengambil 'nama' atau 'username' dari database PostgreSQL
+            sellerName = data['nama'] ?? data['username'] ?? "Penjual Mahasiswa";
+          });
+        }
+      } else {
+        if (mounted) setState(() => sellerName = "User ID: $sId");
       }
     } catch (e) {
-      if (mounted) setState(() => sellerName = "Penjual Mahasiswa");
+      print("Error fetching seller: $e");
+      if (mounted) setState(() => sellerName = "Gagal Memuat Nama");
     }
   }
 
@@ -59,9 +70,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  // ==========================================
-  // 1. LOGIKA TAMBAH KE KERANJANG (DIPERBAIKI)
-  // ==========================================
   Future<void> _handleAddToCart(UserProvider userProvider) async {
     if (isBuying) return;
     final user = userProvider.currentUser;
@@ -71,7 +79,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
     setState(() => isBuying = true);
     try {
-      // PERBAIKAN: Sertakan parameter gambar agar data di keranjang lengkap
       var response = await OrderService().addToCart(
           buyerId,
           widget.product.id,
@@ -93,9 +100,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
   }
 
-  // ==========================================
-  // 2. LOGIKA BELI SEKARANG (SYNC CHAT & ORDER)
-  // ==========================================
   Future<void> _handleBuyNow(UserProvider userProvider) async {
     if (isBuying) return;
     final user = userProvider.currentUser;
@@ -110,7 +114,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       String sId = widget.product.sellerId;
       int sellerIdInt = int.tryParse(sId) ?? 0;
 
-      // 1. Add to Cart (Gunakan ID & Data Valid dari Server)
       var cartResponse = await OrderService().addToCart(
           user.id,
           pId,
@@ -122,18 +125,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
       if (cartResponse == null) throw Exception("Gagal add to cart");
 
-      // Ambil ID dari respon Cart Service untuk sinkronisasi chat
       String validProductId = cartResponse['cart']['product_id'].toString();
       String validSellerId = cartResponse['cart']['seller_id'].toString();
 
-      // 2. Proses Checkout
       await Future.delayed(Duration(milliseconds: 300));
       bool checkoutSuccess = await OrderService().checkout(user.id);
 
       if (checkoutSuccess) {
         if (!mounted) return;
 
-        // 3. KIRIM PESAN OTOMATIS KE DATABASE (Format ORDER_INFO)
         String orderMessage = "ORDER_INFO|${widget.product.namaProduk}|${widget.product.harga}|${widget.product.gambar.isNotEmpty ? widget.product.gambar[0] : ""}";
 
         await ChatService().sendChat(
@@ -143,7 +143,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           orderMessage,
         );
 
-        // 4. Pindah ke Chat Room
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (_) => ChatRoomScreen(
@@ -219,18 +218,45 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   ),
                   SizedBox(height: 12),
                   Text(widget.product.namaProduk, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w600)),
+
                   SizedBox(height: 20),
+
+                  // --- BAGIAN INFO PENJUAL ---
                   Container(
                     padding: EdgeInsets.all(12),
-                    decoration: BoxDecoration(color: Colors.grey[50], borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.grey[200]!)),
+                    decoration: BoxDecoration(
+                        color: Colors.grey[50],
+                        borderRadius: BorderRadius.circular(15),
+                        border: Border.all(color: Colors.grey[200]!)
+                    ),
                     child: Row(
                       children: [
-                        CircleAvatar(radius: 20, backgroundColor: pnpPrimaryBlue.withOpacity(0.1), child: Icon(Icons.store, color: pnpPrimaryBlue, size: 20)),
+                        CircleAvatar(
+                            radius: 20,
+                            backgroundColor: pnpPrimaryBlue.withOpacity(0.1),
+                            child: Icon(Icons.store, color: pnpPrimaryBlue, size: 20)
+                        ),
                         SizedBox(width: 12),
-                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(sellerName, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)), Text("ID Penjual: ${widget.product.sellerId}", style: TextStyle(fontSize: 12, color: Colors.grey[600]))])),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  // Menampilkan nama penjual hasil fetch API
+                                  Text(
+                                      sellerName,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)
+                                  ),
+                                  Text(
+                                      "ID Penjual: ${widget.product.sellerId}",
+                                      style: TextStyle(fontSize: 12, color: Colors.grey[600])
+                                  )
+                                ]
+                            )
+                        ),
                       ],
                     ),
                   ),
+
                   SizedBox(height: 25),
                   Text("Deskripsi", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                   SizedBox(height: 8),
