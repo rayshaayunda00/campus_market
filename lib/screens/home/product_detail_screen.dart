@@ -7,6 +7,7 @@ import '../../models/product_model.dart';
 import '../../services/order_service.dart';
 import '../../services/chat_service.dart';
 import '../../providers/user_provider.dart';
+import '../../api/api_services.dart'; // Import ApiServices untuk Base URL
 import '../chat/chat_room_screen.dart';
 import '../cart/cart_screen.dart';
 
@@ -32,6 +33,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     _fetchSellerName();
   }
 
+  // ==========================================
+  // LOGIKA FETCH NAMA PENJUAL (DIPERBAIKI)
+  // ==========================================
   Future<void> _fetchSellerName() async {
     String sId = widget.product.sellerId;
 
@@ -41,16 +45,15 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     }
 
     try {
-      // Port 8091 adalah port User Service sesuai konfigurasi Docker
-      final String url = 'http://10.0.2.2:8091/users/$sId';
+      // Menggunakan ApiServices.baseUrlUser untuk fleksibilitas Host/IP
+      final String url = '${ApiServices.baseUrlUser}/users/$sId';
       final response = await http.get(Uri.parse(url));
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-
         if (mounted) {
           setState(() {
-            // Mengambil 'nama' atau 'username' dari database PostgreSQL
+            // Mengambil field 'nama' dari hasil query PostgreSQL
             sellerName = data['nama'] ?? data['username'] ?? "Penjual Mahasiswa";
           });
         }
@@ -221,7 +224,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
 
                   SizedBox(height: 20),
 
-                  // --- BAGIAN INFO PENJUAL ---
+                  // --- BAGIAN INFO PENJUAL (DENGAN NAMA DINAMIS) ---
                   Container(
                     padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -241,7 +244,6 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                             child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  // Menampilkan nama penjual hasil fetch API
                                   Text(
                                       sellerName,
                                       style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)
