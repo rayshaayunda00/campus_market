@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../api/api_services.dart'; // Pastikan path ini benar sesuai struktur foldermu
+import '../api/api_services.dart';
 
 class AuthService {
 
@@ -26,8 +26,16 @@ class AuthService {
     return null;
   }
 
-  // 2. REGISTER (Update dengan NIM & Role)
-  Future<bool> register(String nama, String nim, String email, String password, String role) async {
+  // 2. REGISTER (DIPERBAIKI: Menambahkan parameter Jurusan & Prodi)
+  Future<bool> register(
+      String nama,
+      String nim,
+      String jurusan, // Tambahkan ini
+      String prodi,   // Tambahkan ini
+      String email,
+      String password,
+      String role
+      ) async {
     try {
       final url = Uri.parse('${ApiServices.baseUrlUser}/register');
       final response = await http.post(
@@ -35,13 +43,16 @@ class AuthService {
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "nama": nama,
-          "nim": nim,         // Kirim NIM
+          "nim": nim,
+          "jurusan": jurusan, // Kirim data Jurusan ke Backend
+          "prodi": prodi,     // Kirim data Prodi ke Backend
           "email": email,
           "password": password,
-          "role": role        // Kirim Role (penjual/pembeli)
+          "role": role
         }),
       );
 
+      // Mengembalikan true jika status code 200 (OK) atau 201 (Created)
       return response.statusCode == 200 || response.statusCode == 201;
     } catch (e) {
       print("Register Error: $e");

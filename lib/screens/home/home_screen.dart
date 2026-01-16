@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'dart:async'; // Untuk Timer Notifikasi
 import 'dart:convert'; // Untuk Decode JSON
 import 'package:http/http.dart' as http;
-
 import '../../api/api_services.dart'; // Pastikan path ini benar
 import '../../providers/product_provider.dart';
 import '../../providers/user_provider.dart';
@@ -341,11 +340,13 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Cari bagian Widget _buildHeaderBanner() dan ganti dengan kode berikut:
+
   Widget _buildHeaderBanner() {
     return Container(
       width: double.infinity,
       margin: EdgeInsets.fromLTRB(20, 20, 20, 0),
-      height: 140,
+      height: 160, // Tinggi ditambah sedikit agar judul muat dengan nyaman
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
@@ -378,14 +379,22 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // SUBTITLE / IDENTITAS KAMPUS
                 Text(
-                    "Selamat Datang di Campus Market",
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: pnpAccentYellow, letterSpacing: 0.5)
+                    "CAMPUS MARKET - PNP",
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: pnpAccentYellow, letterSpacing: 1.2)
                 ),
                 SizedBox(height: 8),
+                // JUDUL UTAMA YANG ANDA MINTA
                 Text(
-                    "Cari Kebutuhan\nKuliahmu Di Sini!",
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 22, height: 1.2)
+                    "Platform Jual-Beli\nBarang Bekas\nKhusus Mahasiswa",
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 20, // Ukuran disesuaikan agar rapi 3 baris
+                        height: 1.2,
+                        letterSpacing: 0.2
+                    )
                 ),
               ],
             ),
